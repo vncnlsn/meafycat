@@ -1,204 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interactive Animation</title>
-<script>
-// Disable scrolling
-document.body.style.overflow = 'hidden';
-
-// Detect user's theme preference (light or dark)
-const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-// Apply styles based on preference
-if (prefersDarkMode) {
-  document.body.style.backgroundColor = '#121212';  // Dark background
-  document.body.style.color = '#ffffff';  // Light text
-} else {
-  document.body.style.backgroundColor = '#f0f0f0';  // Light background
-  document.body.style.color = '#000000';  // Dark text
-}
-
-// Listen for changes in theme preference
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-  const isDarkMode = e.matches;
-  if (isDarkMode) {
-    document.body.style.backgroundColor = '#121212';
-    document.body.style.color = '#ffffff';
-  } else {
-    document.body.style.backgroundColor = '#f0f0f0';
-    document.body.style.color = '#000000';
-  }
-});
-
-// Background
-var backgroundImage = document.createElement('img');
-backgroundImage.src = 'https://i.imgur.com/vAXvJEv.mp4';
-backgroundImage.style.width = '100%';
-backgroundImage.style.height = '100%';
-backgroundImage.style.position = 'fixed';
-backgroundImage.style.top = '0';
-backgroundImage.style.left = '0';
-backgroundImage.style.objectFit = 'cover';
-document.body.appendChild(backgroundImage);
-
-// Cat
-const catImage = document.createElement('img');
-catImage.src = 'https://i.pinimg.com/originals/71/14/df/7114df589c225dc402c182038d8d6dc8.gif';
-catImage.style.width = '5%';  // Reduced size of the cat
-catImage.style.height = 'auto';
-catImage.style.position = 'absolute';
-catImage.style.top = '58%';
-catImage.style.left = '46.3%';
-catImage.style.transform = 'rotate(-62deg)';
-document.body.appendChild(catImage);
-
-// Car Images
-var cars = [];
-for (let i = 0; i < 4; i++) {
-  let car = document.createElement('img');
-  car.src = 'https://www.freeiconspng.com/thumbs/top-car-view-png/yellow-top-car-png-7.png';
-  car.style.width = '15%';
-  car.style.height = 'auto';
-  car.style.position = 'absolute';
-  car.style.top = '-100px';
-  car.style.left = `${(i + 1) * 20}%`;
-  car.style.transform = 'rotate(-90deg)';
-  document.body.appendChild(car);
-  cars.push({ element: car, hit: false });
-}
-
-// Score
-let score = 0;
-const scoreDisplay = document.createElement('div');
-scoreDisplay.style.position = 'absolute';
-scoreDisplay.style.top = '10px';
-scoreDisplay.style.left = '10px';
-scoreDisplay.style.fontSize = '24px';
-scoreDisplay.style.color = 'white';
-scoreDisplay.innerHTML = `Score: ${score}`;
-document.body.appendChild(scoreDisplay);
-
-// Cat Animation
-function animateCat() {
-  let speed = 0.5;  // Reduced movement speed
-  let x = parseInt(catImage.style.left); // initial x position
-  let direction = null;  // Keeps track of the direction the cat is moving (left or right)
-
-  function updatePosition() {
-    // Only move the cat if there is a direction set (left or right)
-    if (direction === 'left') {
-      x -= speed;
-    } else if (direction === 'right') {
-      x += speed;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Animation</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #f0f0f0; /* Light background */
     }
-    // Keep the cat within screen boundaries
-    if (x < 0) x = 0;
-    if (x > 93) x = 93;
 
-    // Update cat position
-    catImage.style.left = x + '%';
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+      color: white;
+    }
 
-    // Collision detection with cars
-    cars.forEach(car => {
-      if (!car.hit) {  // Only check collision if the car hasn't been hit yet
-        let carRect = car.element.getBoundingClientRect();
-        let catRect = catImage.getBoundingClientRect();
-        
-        // Check if the cat collides with the car (this is a basic AABB collision)
-        if (catRect.left < carRect.right && catRect.right > carRect.left &&
-            catRect.top < carRect.bottom && catRect.bottom > carRect.top) {
-          handleCarCollision(car);
-        }
+    .car {
+      position: absolute;
+      width: 15%;
+      height: auto;
+      transform: rotate(0deg);
+      top: -100px;
+    }
+
+    .cat {
+      position: absolute;
+      width: 5%;
+      height: auto;
+      top: 55%;
+      left: 47.5%;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+
+  <script>
+    // Game variables
+    let score = 0;
+    const scoreDisplay = document.getElementById('score');
+    const catImage = document.createElement('img');
+    catImage.src = 'https://i.pinimg.com/originals/71/14/df/7114df589c225dc402c182038d8d6dc8.gif';
+    catImage.className = 'cat';
+    document.body.appendChild(catImage);
+
+    // Cat movement
+    let catX = parseInt(catImage.style.left);
+    let catDirection = 0; // 0 for no movement, -1 for left, 1 for right
+
+    function moveCat() {
+      if (catDirection === -1) {
+        catX -= 1;
+      } else if (catDirection === 1) {
+        catX += 1;
+      }
+
+      // Boundary check
+      if (catX < 0) catX = 0;
+      if (catX > 93) catX = 93;
+
+      catImage.style.left = catX + '%';
+    }
+
+    // Control movement with arrow keys
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'ArrowLeft') {
+        catDirection = -1;  // Move left
+      } else if (e.code === 'ArrowRight') {
+        catDirection = 1;   // Move right
       }
     });
-  }
 
-  function startMovement(newDirection) {
-    if (direction !== newDirection) {  // Only change direction if it's different
-      direction = newDirection;
+    document.addEventListener('keyup', () => {
+      catDirection = 0;  // Stop moving when key is released
+    });
+
+    // Car setup
+    const cars = [];
+    function createCar() {
+      const car = document.createElement('img');
+      car.src = 'https://www.freeiconspng.com/thumbs/top-car-view-png/yellow-top-car-png-7.png';
+      car.className = 'car';
+
+      // Randomly choose a lane (left or right)
+      const lane = Math.random() < 0.5 ? 20 : 65;  // 20% for left lane, 65% for right lane
+      car.style.left = `${lane}%`;
+      car.style.top = '-100px';
+
+      document.body.appendChild(car);
+      cars.push(car);
     }
-  }
 
-  function stopMovement() {
-    direction = null;  // Stop movement when no direction is pressed
-  }
+    // Move cars down the screen
+    function moveCars() {
+      cars.forEach((car, index) => {
+        const carY = parseInt(car.style.top);
 
-  // Arrow keys event listeners
-  document.addEventListener('keydown', function(event) {
-    if (event.code === 'ArrowLeft') {
-      startMovement('left');
-    } else if (event.code === 'ArrowRight') {
-      startMovement('right');
+        // Move car down
+        car.style.top = carY + 2 + '%';  // Slightly slow car speed
+
+        // Check for collision with cat
+        if (carY >= 55 && carY <= 60 && Math.abs(parseInt(car.style.left) - catX) < 5) {
+          handleCollision(car);
+        }
+
+        // Reset car once it moves off-screen
+        if (carY >= 100) {
+          car.style.top = '-100px';
+        }
+      });
     }
-  });
 
-  // Arrow keys event listeners to stop movement
-  document.addEventListener('keyup', function(event) {
-    if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
-      stopMovement();
+    // Collision handling
+    function handleCollision(car) {
+      // Remove the car and update score
+      car.style.transition = 'transform 1s ease-in-out';
+      car.style.transform = 'rotate(720deg)'; // Spin the car on impact
+      setTimeout(() => {
+        car.remove();
+        score += 100;
+        scoreDisplay.innerText = `Score: ${score}`;
+        // Add new car after collision
+        createCar();
+      }, 1000);
     }
-  });
 
-  // Start updating image position
-  setInterval(updatePosition, 16);  // Update every 16ms for smooth animation (60fps)
-}
-// Call the animation function for the cat image
-animateCat();
+    // Spawn cars at random intervals
+    setInterval(createCar, 2000);  // Create a car every 2 seconds
 
-// Car Animation and Collision Handling
-function animateCar(car) {
-  let angle = 90;
-  let speed = 2;  // Reduced car speed for better gameplay
-  let x = parseInt(car.element.style.left);
-  let y = parseInt(car.element.style.top);
-  let intervalId;
-  let radians = angle * Math.PI / 180;
-
-  function updatePosition() {
-    x += speed * Math.cos(radians) / 20;
-    y += speed * Math.sin(radians) / 20;
-    car.element.style.left = x + '%';
-    car.element.style.top = y + '%';
-
-    if (Date.now() - startTime >= getRandomInt(4000, 10000)) {
-      clearInterval(intervalId);
-      car.element.style.top = '-100px';
-      animateCar(car); // Restart car animation
+    // Main game loop
+    function gameLoop() {
+      moveCat();
+      moveCars();
+      requestAnimationFrame(gameLoop);  // Keep the game running at 60fps
     }
-  }
 
-  let startTime = Date.now();
-  intervalId = setInterval(updatePosition, 16); // Reduced speed and update interval
-}
+    // Start the game
+    gameLoop();
 
-// Start the car animations
-cars.forEach(car => animateCar(car));
-
-// Handle Collision
-function handleCarCollision(car) {
-  // Mark the car as hit
-  car.hit = true;
-
-  // Stop the car and spin it off-screen
-  car.element.style.transition = 'transform 1s ease-in-out';
-  car.element.style.transform = 'rotate(720deg)'; // Spin the car
-  setTimeout(() => {
-    car.element.style.transform = 'rotate(-90deg)'; // Reset rotation for the next collision
-    car.element.style.top = '-100px'; // Move car off-screen
-    animateCar(car); // Restart car animation
-
-    // Add score
-    score += 100;
-    scoreDisplay.innerHTML = `Score: ${score}`;
-  }, 1000); // Wait for the spin to complete before resetting the car
-}
-
-// Helper function to get a random integer between min and max (inclusive)
-function getRandomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-</script>
+  </script>
 </body>
 </html>

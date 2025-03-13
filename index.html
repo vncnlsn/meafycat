@@ -4,12 +4,33 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Interactive Animation</title>
-</head>
-<body>
-
 <script>
 // Disable scrolling
 document.body.style.overflow = 'hidden';
+
+// Detect user's theme preference (light or dark)
+const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+// Apply styles based on preference
+if (prefersDarkMode) {
+  document.body.style.backgroundColor = '#121212';  // Dark background
+  document.body.style.color = '#ffffff';  // Light text
+} else {
+  document.body.style.backgroundColor = '#f0f0f0';  // Light background
+  document.body.style.color = '#000000';  // Dark text
+}
+
+// Listen for changes in theme preference
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  const isDarkMode = e.matches;
+  if (isDarkMode) {
+    document.body.style.backgroundColor = '#121212';
+    document.body.style.color = '#ffffff';
+  } else {
+    document.body.style.backgroundColor = '#f0f0f0';
+    document.body.style.color = '#000000';
+  }
+});
 
 // Background
 var backgroundImage = document.createElement('img');
@@ -33,8 +54,8 @@ catImage.style.left = '46.3%';
 catImage.style.transform = 'rotate(-62deg)';
 document.body.appendChild(catImage);
 
-// Cars (multiple for spawning)
-let cars = [];
+// Car Images
+var cars = [];
 for (let i = 0; i < 4; i++) {
   let car = document.createElement('img');
   car.src = 'https://www.freeiconspng.com/thumbs/top-car-view-png/yellow-top-car-png-7.png';
@@ -42,185 +63,162 @@ for (let i = 0; i < 4; i++) {
   car.style.height = 'auto';
   car.style.position = 'absolute';
   car.style.top = '-100px';
+  car.style.left = `${(i + 1) * 20}%`;
   car.style.transform = 'rotate(-90deg)';
   document.body.appendChild(car);
-  cars.push(car);
+  cars.push({ element: car, hit: false });
 }
 
-// Power-up elements (extra life, speed boost)
-let powerUps = [];
-
-// Score display
+// Score
 let score = 0;
-let scoreDisplay = document.createElement('div');
+const scoreDisplay = document.createElement('div');
 scoreDisplay.style.position = 'absolute';
 scoreDisplay.style.top = '10px';
 scoreDisplay.style.left = '10px';
+scoreDisplay.style.fontSize = '24px';
 scoreDisplay.style.color = 'white';
-scoreDisplay.innerText = 'Score: 0';
+scoreDisplay.innerHTML = `Score: ${score}`;
 document.body.appendChild(scoreDisplay);
 
-// Game state variables
-let gameStarted = false;
-let gameOver = false;
-let missedCars = 0;
-
-// Cat movement speed and direction
-let speed = 1;
-let angle = 0;
-let catSpeed = 1.5; // Increased speed for cat
-
-// Update cat position
+// Cat Animation
 function animateCat() {
-  let x = parseInt(catImage.style.left);
-  let y = parseInt(catImage.style.top);
+  let angle = 0;
+  let speed = 0;
+  let x = parseInt(catImage.style.left); // initial x position
+  let y = parseInt(catImage.style.top); // initial y position
+  let intervalId; // setInterval ID
+  let isMoving = false; // flag to keep track of movement
+  let step = 10; // how much the angle changes with each key press
 
   function updatePosition() {
+    // Convert angle to radians
     let radians = angle * Math.PI / 180;
-    y -= speed * Math.cos(radians) / 20;
+    // Calculate new position
+    y -= speed * Math.cos(radians) / 20; // divide by 20 to convert to pixels
     x += speed * Math.sin(radians) / 20;
-
+    // Keep cat within screen boundaries
     if (x < 0) x = 0;
     if (x > 93) x = 93;
     if (y < 0) y = 0;
     if (y > 90) y = 90;
-
+    // Update cat position
     catImage.style.left = x + '%';
     catImage.style.top = y + '%';
+    
+    // Collision detection with cars
+    cars.forEach(car => {
+      if (!car.hit) {  // Only check collision if the car hasn't been hit yet
+        let carRect = car.element.getBoundingClientRect();
+        let catRect = catImage.getBoundingClientRect();
+        
+        // Check if the cat collides with the car (this is a basic AABB collision)
+        if (catRect.left < carRect.right && catRect.right > carRect.left &&
+            catRect.top < carRect.bottom && catRect.bottom > carRect.top) {
+          handleCarCollision(car);
+        }
+      }
+    });
   }
 
-  setInterval(updatePosition, 1);
-}
-
-document.addEventListener('keydown', function (event) {
-  if (event.code === 'ArrowUp') {
-    speed = catSpeed;
-  } else if (event.code === 'ArrowLeft') {
-    angle -= 10;
-    catImage.style.transform = `rotate(${angle - 62}deg)`;
-  } else if (event.code === 'ArrowRight') {
-    angle += 10;
-    catImage.style.transform = `rotate(${angle - 62}deg)`;
-  } else if (event.code === 'ArrowDown') {
-    speed = 0;
-  }
-});
-
-// Start the game when space bar or number 7 is pressed
-document.addEventListener('keydown', function (event) {
-  if (event.code === 'Space' || event.code === 'Digit7') {
-    if (!gameStarted && !gameOver) {
-      gameStarted = true;
-      animateCat();
-      spawnCars();
+  function startMovement() {
+    if (!isMoving) {
+      speed = 0.5;
+      isMoving = true;
     }
   }
-});
 
-// Car movement and logic
-function animateCar(car, speed) {
-  let x = parseInt(car.style.left);
-  let y = parseInt(car.style.top);
+  function stopMovement() {
+    if (isMoving) {
+      speed = 0;
+      isMoving = false;
+    }
+  }
+
+  function turnLeft() {
+    if (isMoving) {
+      angle -= step;
+      catImage.style.transform = `rotate(${angle - 62}deg)`;
+    }
+  }
+
+  function turnRight() {
+    if (isMoving) {
+      angle += step;
+      catImage.style.transform = `rotate(${angle - 62}deg)`;
+    }
+  }
+
+  // Arrow keys event listeners
+  document.addEventListener('keydown', function(event) {
+    if (event.code === 'ArrowUp') {
+      startMovement();
+    } else if (event.code === 'ArrowLeft') {
+      turnLeft();
+    } else if (event.code === 'ArrowRight') {
+      turnRight();
+    } else if (event.code === 'ArrowDown') {
+      stopMovement();
+    }
+  });
+
+  // Start updating image position
+  intervalId = setInterval(updatePosition, 1);
+}
+// Call the animation function for the cat image
+animateCat();
+
+// Car Animation and Collision Handling
+function animateCar(car) {
+  let angle = 90;
+  let speed = 5;
+  let x = parseInt(car.element.style.left);
+  let y = parseInt(car.element.style.top);
   let intervalId;
+  let radians = angle * Math.PI / 180;
 
   function updatePosition() {
-    y += speed;
+    x += speed * Math.cos(radians) / 20;
+    y += speed * Math.sin(radians) / 20;
+    car.element.style.left = x + '%';
+    car.element.style.top = y + '%';
 
-    if (y > 100) {
-      y = -100;
-      missedCars += 1;
-      if (missedCars >= 5) {
-        gameOver = true;
-        alert('Game Over!');
-      }
+    if (Date.now() - startTime >= getRandomInt(4000, 10000)) {
+      clearInterval(intervalId);
+      car.element.style.top = '-100px';
+      animateCar(car); // Restart car animation
     }
-
-    car.style.left = x + '%';
-    car.style.top = y + '%';
   }
 
+  let startTime = Date.now();
   intervalId = setInterval(updatePosition, 1);
 }
 
-// Gradually increase car speed and spawn new cars
-let carSpeed = 0.5;
-let carInterval = 1000;
-function spawnCars() {
-  cars.forEach((car, index) => {
-    setTimeout(() => {
-      animateCar(car, carSpeed);
-    }, carInterval * index);
-  });
+// Start the car animations
+cars.forEach(car => animateCar(car));
 
-  let carIncreaseInterval = setInterval(() => {
-    if (gameStarted && !gameOver) {
-      carSpeed += 0.1;
-      carInterval = Math.max(200, carInterval - 50);
-      if (missedCars >= 5) clearInterval(carIncreaseInterval);
-    }
-  }, 1000);
+// Handle Collision
+function handleCarCollision(car) {
+  // Mark the car as hit
+  car.hit = true;
+
+  // Stop the car and spin it off-screen
+  car.element.style.transition = 'transform 1s ease-in-out';
+  car.element.style.transform = 'rotate(720deg)'; // Spin the car
+  setTimeout(() => {
+    car.element.style.transform = 'rotate(-90deg)'; // Reset rotation for the next collision
+    car.element.style.top = '-100px'; // Move car off-screen
+    animateCar(car); // Restart car animation
+
+    // Add score
+    score += 100;
+    scoreDisplay.innerHTML = `Score: ${score}`;
+  }, 1000); // Wait for the spin to complete before resetting the car
 }
 
-// Power-up logic (speed boost, extra life)
-function spawnPowerUps() {
-  let powerUp = document.createElement('div');
-  powerUp.style.position = 'absolute';
-  powerUp.style.width = '10px';
-  powerUp.style.height = '10px';
-  powerUp.style.backgroundColor = 'yellow';
-  powerUp.style.borderRadius = '50%';
-  powerUp.style.left = Math.random() * 100 + '%';
-  powerUp.style.top = Math.random() * 100 + '%';
-  document.body.appendChild(powerUp);
-  powerUps.push(powerUp);
-
-  setInterval(() => {
-    if (powerUps.length > 0) {
-      let p = powerUps[0];
-      let pX = parseInt(p.style.left);
-      let pY = parseInt(p.style.top);
-      let cX = parseInt(catImage.style.left);
-      let cY = parseInt(catImage.style.top);
-
-      if (Math.abs(pX - cX) < 5 && Math.abs(pY - cY) < 5) {
-        score += 100;
-        scoreDisplay.innerText = 'Score: ' + score;
-        powerUps.splice(0, 1);
-        document.body.removeChild(p); // Remove power-up after collision
-      }
-    }
-  }, 500);
+// Helper function to get a random integer between min and max (inclusive)
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-
-// Start spawning power-ups at intervals
-setInterval(spawnPowerUps, 5000);
-
-// Update score for every car hit
-function updateScore() {
-  cars.forEach(car => {
-    let cX = parseInt(car.style.left);
-    let cY = parseInt(car.style.top);
-    let catX = parseInt(catImage.style.left);
-    let catY = parseInt(catImage.style.top);
-
-    if (Math.abs(cX - catX) < 5 && Math.abs(cY - catY) < 5) {
-      score += 100;
-      scoreDisplay.innerText = 'Score: ' + score;
-    }
-  });
-}
-
-// Game loop to continuously check for collisions and game over condition
-function gameLoop() {
-  if (gameStarted && !gameOver) {
-    updateScore();
-  }
-}
-
-// Start the game loop
-setInterval(gameLoop, 50);
-
 </script>
-
 </body>
 </html>

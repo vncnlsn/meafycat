@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Animation</title>
+</head>
+<body>
+
+<script>
+// Disable scrolling
+document.body.style.overflow = 'hidden';
+
+// Background
+var backgroundImage = document.createElement('img');
+backgroundImage.src = 'https://i.imgur.com/vAXvJEv.mp4';
+backgroundImage.style.width = '100%';
+backgroundImage.style.height = '100%';
+backgroundImage.style.position = 'fixed';
+backgroundImage.style.top = '0';
+backgroundImage.style.left = '0';
+backgroundImage.style.objectFit = 'cover';
+document.body.appendChild(backgroundImage);
+
+// Cat
+const catImage = document.createElement('img');
+catImage.src = 'https://i.pinimg.com/originals/71/14/df/7114df589c225dc402c182038d8d6dc8.gif';
+catImage.style.width = '7%';
+catImage.style.height = 'auto';
+catImage.style.position = 'absolute';
+catImage.style.top = '58%';
+catImage.style.left = '46.3%';
+catImage.style.transform = 'rotate(-62deg)';
+document.body.appendChild(catImage);
+
+// Cars (multiple for spawning)
+let cars = [];
+for (let i = 0; i < 4; i++) {
+  let car = document.createElement('img');
+  car.src = 'https://www.freeiconspng.com/thumbs/top-car-view-png/yellow-top-car-png-7.png';
+  car.style.width = '15%';
+  car.style.height = 'auto';
+  car.style.position = 'absolute';
+  car.style.top = '-100px';
+  car.style.transform = 'rotate(-90deg)';
+  document.body.appendChild(car);
+  cars.push(car);
+}
+
+// Power-up elements (extra life, speed boost)
+let powerUps = [];
+
+// Score display
+let score = 0;
+let scoreDisplay = document.createElement('div');
+scoreDisplay.style.position = 'absolute';
+scoreDisplay.style.top = '10px';
+scoreDisplay.style.left = '10px';
+scoreDisplay.style.color = 'white';
+scoreDisplay.innerText = 'Score: 0';
+document.body.appendChild(scoreDisplay);
+
+// Game state variables
+let gameStarted = false;
+let gameOver = false;
+let missedCars = 0;
+
+// Cat movement speed and direction
+let speed = 1;
+let angle = 0;
+let catSpeed = 1.5; // Increased speed for cat
+
+// Update cat position
+function animateCat() {
+  let x = parseInt(catImage.style.left);
+  let y = parseInt(catImage.style.top);
+
+  function updatePosition() {
+    let radians = angle * Math.PI / 180;
+    y -= speed * Math.cos(radians) / 20;
+    x += speed * Math.sin(radians) / 20;
+
+    if (x < 0) x = 0;
+    if (x > 93) x = 93;
+    if (y < 0) y = 0;
+    if (y > 90) y = 90;
+
+    catImage.style.left = x + '%';
+    catImage.style.top = y + '%';
+  }
+
+  setInterval(updatePosition, 1);
+}
+
+document.addEventListener('keydown', function (event) {
+  if (event.code === 'ArrowUp') {
+    speed = catSpeed;
+  } else if (event.code === 'ArrowLeft') {
+    angle -= 10;
+    catImage.style.transform = `rotate(${angle - 62}deg)`;
+  } else if (event.code === 'ArrowRight') {
+    angle += 10;
+    catImage.style.transform = `rotate(${angle - 62}deg)`;
+  } else if (event.code === 'ArrowDown') {
+    speed = 0;
+  }
+});
+
+// Start the game when space bar or number 7 is pressed
+document.addEventListener('keydown', function (event) {
+  if (event.code === 'Space' || event.code === 'Digit7') {
+    if (!gameStarted && !gameOver) {
+      gameStarted = true;
+      animateCat();
+      spawnCars();
+    }
+  }
+});
+
+// Car movement and logic
+function animateCar(car, speed) {
+  let x = parseInt(car.style.left);
+  let y = parseInt(car.style.top);
+  let intervalId;
+
+  function updatePosition() {
+    y += speed;
+
+    if (y > 100) {
+      y = -100;
+      missedCars += 1;
+      if (missedCars >= 5) {
+        gameOver = true;
+        alert('Game Over!');
+      }
+    }
+
+    car.style.left = x + '%';
+    car.style.top = y + '%';
+  }
+
+  intervalId = setInterval(updatePosition, 1);
+}
+
+// Gradually increase car speed and spawn new cars
+let carSpeed = 0.5;
+let carInterval = 1000;
+function spawnCars() {
+  cars.forEach((car, index) => {
+    setTimeout(() => {
+      animateCar(car, carSpeed);
+    }, carInterval * index);
+  });
+
+  let carIncreaseInterval = setInterval(() => {
+    if (gameStarted && !gameOver) {
+      carSpeed += 0.1;
+      carInterval = Math.max(200, carInterval - 50);
+      if (missedCars >= 5) clearInterval(carIncreaseInterval);
+    }
+  }, 1000);
+}
+
+// Power-up logic (speed boost, extra life)
+function spawnPowerUps() {
+  let powerUp = document.createElement('div');
+  powerUp.style.position = 'absolute';
+  powerUp.style.width = '10px';
+  powerUp.style.height = '10px';
+  powerUp.style.backgroundColor = 'yellow';
+  powerUp.style.borderRadius = '50%';
+  powerUp.style.left = Math.random() * 100 + '%';
+  powerUp.style.top = Math.random() * 100 + '%';
+  document.body.appendChild(powerUp);
+  powerUps.push(powerUp);
+
+  setInterval(() => {
+    if (powerUps.length > 0) {
+      let p = powerUps[0];
+      let pX = parseInt(p.style.left);
+      let pY = parseInt(p.style.top);
+      let cX = parseInt(catImage.style.left);
+      let cY = parseInt(catImage.style.top);
+
+      if (Math.abs(pX - cX) < 5 && Math.abs(pY - cY) < 5) {
+        score += 100;
+        scoreDisplay.innerText = 'Score: ' + score;
+        powerUps.splice(0, 1);
+        document.body.removeChild(p); // Remove power-up after collision
+      }
+    }
+  }, 500);
+}
+
+// Start spawning power-ups at intervals
+setInterval(spawnPowerUps, 5000);
+
+// Update score for every car hit
+function updateScore() {
+  cars.forEach(car => {
+    let cX = parseInt(car.style.left);
+    let cY = parseInt(car.style.top);
+    let catX = parseInt(catImage.style.left);
+    let catY = parseInt(catImage.style.top);
+
+    if (Math.abs(cX - catX) < 5 && Math.abs(cY - catY) < 5) {
+      score += 100;
+      scoreDisplay.innerText = 'Score: ' + score;
+    }
+  });
+}
+
+// Game loop to continuously check for collisions and game over condition
+function gameLoop() {
+  if (gameStarted && !gameOver) {
+    updateScore();
+  }
+}
+
+// Start the game loop
+setInterval(gameLoop, 50);
+
+</script>
+
+</body>
+</html>

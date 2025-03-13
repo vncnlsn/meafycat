@@ -46,7 +46,7 @@ document.body.appendChild(backgroundImage);
 // Cat
 const catImage = document.createElement('img');
 catImage.src = 'https://i.pinimg.com/originals/71/14/df/7114df589c225dc402c182038d8d6dc8.gif';
-catImage.style.width = '7%';
+catImage.style.width = '5%';  // Reduced size of the cat
 catImage.style.height = 'auto';
 catImage.style.position = 'absolute';
 catImage.style.top = '58%';
@@ -82,29 +82,27 @@ document.body.appendChild(scoreDisplay);
 
 // Cat Animation
 function animateCat() {
-  let angle = 0;
   let speed = 0;
   let x = parseInt(catImage.style.left); // initial x position
   let y = parseInt(catImage.style.top); // initial y position
   let intervalId; // setInterval ID
   let isMoving = false; // flag to keep track of movement
-  let step = 10; // how much the angle changes with each key press
+  let direction = null;  // Keeps track of the direction the cat is moving (left or right)
 
   function updatePosition() {
-    // Convert angle to radians
-    let radians = angle * Math.PI / 180;
-    // Calculate new position
-    y -= speed * Math.cos(radians) / 20; // divide by 20 to convert to pixels
-    x += speed * Math.sin(radians) / 20;
-    // Keep cat within screen boundaries
+    // Only move the cat if there is a direction set (left or right)
+    if (direction === 'left') {
+      x -= speed;
+    } else if (direction === 'right') {
+      x += speed;
+    }
+    // Keep the cat within screen boundaries
     if (x < 0) x = 0;
     if (x > 93) x = 93;
-    if (y < 0) y = 0;
-    if (y > 90) y = 90;
+
     // Update cat position
     catImage.style.left = x + '%';
-    catImage.style.top = y + '%';
-    
+
     // Collision detection with cars
     cars.forEach(car => {
       if (!car.hit) {  // Only check collision if the car hasn't been hit yet
@@ -120,43 +118,30 @@ function animateCat() {
     });
   }
 
-  function startMovement() {
-    if (!isMoving) {
-      speed = 0.5;
-      isMoving = true;
+  function startMovement(newDirection) {
+    if (direction !== newDirection) {  // Only change direction if it's different
+      direction = newDirection;
+      speed = 0.5; // Start moving at a constant speed
     }
   }
 
   function stopMovement() {
-    if (isMoving) {
-      speed = 0;
-      isMoving = false;
-    }
-  }
-
-  function turnLeft() {
-    if (isMoving) {
-      angle -= step;
-      catImage.style.transform = `rotate(${angle - 62}deg)`;
-    }
-  }
-
-  function turnRight() {
-    if (isMoving) {
-      angle += step;
-      catImage.style.transform = `rotate(${angle - 62}deg)`;
-    }
+    direction = null;  // Stop movement when no direction is pressed
+    speed = 0; // Stop moving
   }
 
   // Arrow keys event listeners
   document.addEventListener('keydown', function(event) {
-    if (event.code === 'ArrowUp') {
-      startMovement();
-    } else if (event.code === 'ArrowLeft') {
-      turnLeft();
+    if (event.code === 'ArrowLeft') {
+      startMovement('left');
     } else if (event.code === 'ArrowRight') {
-      turnRight();
-    } else if (event.code === 'ArrowDown') {
+      startMovement('right');
+    }
+  });
+
+  // Arrow keys event listeners to stop movement
+  document.addEventListener('keyup', function(event) {
+    if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
       stopMovement();
     }
   });

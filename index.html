@@ -82,11 +82,8 @@ document.body.appendChild(scoreDisplay);
 
 // Cat Animation
 function animateCat() {
-  let speed = 0;
+  let speed = 0.5;  // Reduced movement speed
   let x = parseInt(catImage.style.left); // initial x position
-  let y = parseInt(catImage.style.top); // initial y position
-  let intervalId; // setInterval ID
-  let isMoving = false; // flag to keep track of movement
   let direction = null;  // Keeps track of the direction the cat is moving (left or right)
 
   function updatePosition() {
@@ -121,13 +118,11 @@ function animateCat() {
   function startMovement(newDirection) {
     if (direction !== newDirection) {  // Only change direction if it's different
       direction = newDirection;
-      speed = 0.5; // Start moving at a constant speed
     }
   }
 
   function stopMovement() {
     direction = null;  // Stop movement when no direction is pressed
-    speed = 0; // Stop moving
   }
 
   // Arrow keys event listeners
@@ -147,7 +142,7 @@ function animateCat() {
   });
 
   // Start updating image position
-  intervalId = setInterval(updatePosition, 1);
+  setInterval(updatePosition, 16);  // Update every 16ms for smooth animation (60fps)
 }
 // Call the animation function for the cat image
 animateCat();
@@ -155,7 +150,7 @@ animateCat();
 // Car Animation and Collision Handling
 function animateCar(car) {
   let angle = 90;
-  let speed = 5;
+  let speed = 2;  // Reduced car speed for better gameplay
   let x = parseInt(car.element.style.left);
   let y = parseInt(car.element.style.top);
   let intervalId;
@@ -175,7 +170,7 @@ function animateCar(car) {
   }
 
   let startTime = Date.now();
-  intervalId = setInterval(updatePosition, 1);
+  intervalId = setInterval(updatePosition, 16); // Reduced speed and update interval
 }
 
 // Start the car animations

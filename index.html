@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cat vs. Cars: Mechanic Test</title>
+    <title>Cat vs. Cars: Mechanic Test v2</title>
     <style>
         body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #333; }
         canvas { border: 2px solid #000; }
@@ -23,37 +23,62 @@
         let reticle = { x: 0, y: 0 };
         let gameOver = false;
 
-        // Spawn cars
+        // Spawn cars (top to bottom)
         function spawnCar() {
             if (gameOver) return;
             const lane = Math.random() < 0.5 ? 0 : 1;
             cars.push({
-                x: lane === 0 ? -50 : 850, // Off-screen start
-                y: lane === 0 ? 300 : 350, // Lane position
-                speed: lane === 0 ? 3 : -3, // Direction
+                x: lane === 0 ? 350 : 450, // Left or right lane
+                y: -20, // Start above screen
+                speed: 3, // Move downward
                 engineHits: 0,
                 tireHit: null
             });
+        }
+
+        // Find nearest car for cat to chase
+        function findNearestCar() {
+            if (cars.length === 0) return null;
+            let nearest = cars[0];
+            let minDist = Math.hypot(cat.x - nearest.x, cat.y - nearest.y);
+            for (let car of cars) {
+                const dist = Math.hypot(cat.x - car.x, cat.y - car.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = car;
+                }
+            }
+            return nearest;
         }
 
         // Update game logic
         function update() {
             if (gameOver) return;
 
-            // Move cat
-            cat.x += cat.enraged ? cat.speed * 1.5 : cat.speed;
-            if (cat.x < 0 || cat.x > 800) cat.speed = -cat.speed; // Bounce off edges
+            // Move cat toward nearest car
+            const targetCar = findNearestCar();
+            if (targetCar) {
+                const dx = targetCar.x - cat.x;
+                const dy = targetCar.y - cat.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 5) { // Avoid jitter when too close
+                    const speed = cat.enraged ? cat.speed * 1.5 : cat.speed;
+                    cat.x += (dx / dist) * speed;
+                    cat.y += (dy / dist) * speed;
+                }
+            }
 
-            // Move cars, check collisions
+            // Move cars (top to bottom)
             cars.forEach((car, i) => {
-                car.x += car.speed;
+                car.y += car.speed;
                 if (Math.abs(car.x - cat.x) < 20 && Math.abs(car.y - cat.y) < 20) {
                     lives--;
                     cars.splice(i, 1); // Remove car
                     cat.x = 400; // Respawn cat
+                    cat.y = 500;
                     if (lives <= 0) gameOver = true;
                 }
-                if (car.x < -50 || car.x > 850) cars.splice(i, 1); // Remove off-screen cars
+                if (car.y > 620) cars.splice(i, 1); // Remove off-screen cars
             });
 
             // Enraged timer (10 sec = 600 frames at 60 FPS)
@@ -62,7 +87,7 @@
                 if (cat.enragedTime <= 0) cat.enraged = false;
             }
 
-            // Increase difficulty (spawn rate)
+            // Spawn cars (increase frequency with score)
             if (Math.random() < 0.02 + score / 10000) spawnCar();
         }
 
@@ -72,11 +97,11 @@
 
             // Draw road
             ctx.fillStyle = '#555';
-            ctx.fillRect(0, 250, 800, 150); // Two-lane road
+            ctx.fillRect(300, 0, 200, 600); // Two-lane road
             ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 323, 800, 4); // Lane divider
+            ctx.fillRect(398, 0, 4, 600); // Lane divider
 
-            // Draw cat (circle for now)
+            // Draw cat (circle)
             ctx.fillStyle = cat.enraged ? 'red' : 'orange';
             ctx.beginPath();
             ctx.arc(cat.x, cat.y, 10, 0, Math.PI * 2);
@@ -85,10 +110,10 @@
             // Draw cars (rectangles)
             cars.forEach(car => {
                 ctx.fillStyle = car.engineHits > 0 ? '#f88' : '#888';
-                ctx.fillRect(car.x, car.y, 40, 20); // Car body
+                ctx.fillRect(car.x - 20, car.y - 10, 40, 20); // Car body
                 ctx.fillStyle = '#000';
-                ctx.fillRect(car.x, car.y + 15, 10, 5); // Left tire
-                ctx.fillRect(car.x + 30, car.y + 15, 10, 5); // Right tire
+                ctx.fillRect(car.x - 20, car.y + 5, 10, 5); // Left tire
+                ctx.fillRect(car.x + 10, car.y + 5, 10, 5); // Right tire
             });
 
             // Draw reticle (crosshair)
@@ -129,15 +154,15 @@
             if (gameOver) return;
 
             cars.forEach((car, i) => {
-                if (reticle.x > car.x && reticle.x < car.x + 40 && reticle.y > car.y && reticle.y < car.y + 20) {
-                    if (reticle.y < car.y + 10) { // Engine hit
+                if (reticle.x > car.x - 20 && reticle.x < car.x + 20 && reticle.y > car.y - 10 && reticle.y < car.y + 10) {
+                    if (reticle.y < car.y) { // Engine hit (top half)
                         car.engineHits++;
                         if (car.engineHits >= 2) {
                             cars.splice(i, 1); // Explode
                             score += 25;
                         }
-                    } else if (reticle.y > car.y + 10) { // Tire hit
-                        if (reticle.x < car.x + 20) { // Left tire
+                    } else if (reticle.y > car.y) { // Tire hit (bottom half)
+                        if (reticle.x < car.x) { // Left tire
                             cars.splice(i, 1); // Swerve right
                             score += 10;
                         } else { // Right tire

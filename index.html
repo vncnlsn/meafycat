@@ -15,15 +15,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Load cat image
-        const catImage = new Image();
-        catImage.src = 'https://i.pinimg.com/originals/71/14/df/7114df589c225dc402c182038d8d6dc8.gif';
-
-        // Load car image from FreeIconsPNG
-        const carImage = new Image();
-        carImage.src = 'https://www.freeiconspng.com/uploads/red-top-down-car-png-19.png';
-        // If CORS blocks this, download the PNG and use: carImage.src = 'assets/red_car.png';
-
         // Game state
         let score = 0;
         let lives = 9;
@@ -112,32 +103,19 @@
                 ctx.fillRect(100 + i * 200 - 2, 0, 4, 600); // Lane dividers at 300, 500, 700, 900
             }
 
-            // Draw cat
-            if (catImage.complete) {
-                ctx.save();
-                ctx.translate(cat.x, cat.y);
-                ctx.rotate(-62 * Math.PI / 180); // -62deg rotation
-                ctx.drawImage(catImage, -35, -35, 70, 70); // 70x70px
-                ctx.restore();
-            } else {
-                ctx.fillStyle = cat.enraged ? 'red' : 'orange';
-                ctx.beginPath();
-                ctx.arc(cat.x, cat.y, 10, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            // Draw cat (basic circle)
+            ctx.fillStyle = cat.enraged ? 'red' : 'orange';
+            ctx.beginPath();
+            ctx.arc(cat.x, cat.y, 10, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Draw cars (using FreeIconsPNG red car)
+            // Draw cars (basic rectangles)
             cars.forEach(car => {
-                if (carImage.complete) {
-                    ctx.drawImage(carImage, car.x - 30, car.y - 15, 60, 30); // 60x30px
-                } else {
-                    // Fallback placeholder
-                    ctx.fillStyle = car.engineHits > 0 ? '#f88' : '#888';
-                    ctx.fillRect(car.x - 30, car.y - 15, 60, 30);
-                    ctx.fillStyle = '#000';
-                    ctx.fillRect(car.x - 30, car.y + 10, 15, 10); // Left tire
-                    ctx.fillRect(car.x + 15, car.y + 10, 15, 10); // Right tire
-                }
+                ctx.fillStyle = car.engineHits > 0 ? '#f88' : '#888';
+                ctx.fillRect(car.x - 30, car.y - 15, 60, 30); // Bigger car
+                ctx.fillStyle = '#000';
+                ctx.fillRect(car.x - 30, car.y + 10, 15, 10); // Left tire
+                ctx.fillRect(car.x + 15, car.y + 10, 15, 10); // Right tire
             });
 
             // Draw reticle (crosshair)
@@ -191,8 +169,8 @@
                 }
             });
 
-            // Check if cat was hit
-            if (Math.abs(x - cat.x) < 35 && Math.abs(y - cat.y) < 35) {
+            // Check if cat was hit (smaller hitbox for circle)
+            if (Math.abs(x - cat.x) < 10 && Math.abs(y - cat.y) < 10) {
                 cat.enraged = true;
                 cat.enragedTime = 600; // 10 sec at 60 FPS
             }

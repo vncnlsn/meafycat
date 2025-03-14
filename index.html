@@ -3,350 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEAFYCAT</title>
+    <title>Cat vs. Cars: Mechanic Test</title>
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            transition: background-color 0.3s;
-            overflow: hidden;
-        }
-        canvas {
-            border: 1px solid #000;
-            width: 100%;
-            max-width: 400px;
-            height: auto;
-        }
-        body {
-            background-color: #f0f0f0;
-            color: #000;
-        }
-        @media (prefers-color-scheme: dark) {
-            body {
-                background-color: #333;
-                color: #fff;
-            }
-        }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #333; }
+        canvas { border: 2px solid #000; }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
-
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Load images
-        const catImage = new Image();
-        catImage.src = 'https://i.pinimg.com/originals/71/14/df/7114df589c225dc402c182038d8d6dc8.gif';
-        const carImage = new Image();
-        carImage.src = 'https://www.freeiconspng.com/thumbs/top-car-view-png/yellow-top-car-png-7.png';
-
         // Game state
         let score = 0;
-        let lives = 9;
-        let catSpeed = 0.35; // Slightly faster cat
-        let objectSpeed = 2;
-        let gameOver = false;
-        let invincible = false;
-        let invincibilityTimer = 0;
-        let carSpawnCount = 0; // Counter for car spawns
-
-        // Player cat properties
-        const cat = {
-            x: canvas.width / 2 - 20,
-            y: canvas.height - 50,
-            width: 40,
-            height: 40
-        };
-
-        // Key state for desktop
-        const keys = { left: false, right: false };
-
-        // Tilt state for mobile
-        let tilt = 0;
-
-        // Arrays for game objects
+        let lives = 3;
+        let cat = { x: 400, y: 500, speed: 2, enraged: false, enragedTime: 0 };
         let cars = [];
-        let powerUps = [];
-        let blueSquares = [];
-        let bombs = [];
+        let reticle = { x: 0, y: 0 };
+        let gameOver = false;
 
-        // Game loop variables
-        let lastTime = 0;
-        let carSpawnTimer = 0;
-        let powerUpSpawnTimer = 0;
-        let blueSquareSpawnTimer = 0;
-        let bombSpawnTimer = 0;
-
-        // Event listeners
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') keys.left = true;
-            if (e.key === 'ArrowRight') keys.right = true;
-        });
-
-        document.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowLeft') keys.left = false;
-            if (e.key === 'ArrowRight') keys.right = false;
-        });
-
-        window.addEventListener('deviceorientation', (e) => {
-            if (e.gamma !== null) tilt = e.gamma;
-        });
-
-        // Constructors
-        function Car() {
-            this.x = Math.random() * (canvas.width - 40);
-            this.y = -40;
-            this.width = 40;
-            this.height = 60;
-            this.speed = objectSpeed;
-            this.spinning = false;
-            this.spinDirection = 0;
-            this.spinAngle = 0;
+        // Spawn cars
+        function spawnCar() {
+            if (gameOver) return;
+            const lane = Math.random() < 0.5 ? 0 : 1;
+            cars.push({
+                x: lane === 0 ? -50 : 850, // Off-screen start
+                y: lane === 0 ? 300 : 350, // Lane position
+                speed: lane === 0 ? 3 : -3, // Direction
+                engineHits: 0,
+                tireHit: null
+            });
         }
 
-        function PowerUp() {
-            this.x = Math.random() * (canvas.width - 20);
-            this.y = -20;
-            this.width = 20;
-            this.height = 20;
-            this.type = Math.random() < 0.5 ? 'life' : 'speed';
+        // Update game logic
+        function update() {
+            if (gameOver) return;
+
+            // Move cat
+            cat.x += cat.enraged ? cat.speed * 1.5 : cat.speed;
+            if (cat.x < 0 || cat.x > 800) cat.speed = -cat.speed; // Bounce off edges
+
+            // Move cars, check collisions
+            cars.forEach((car, i) => {
+                car.x += car.speed;
+                if (Math.abs(car.x - cat.x) < 20 && Math.abs(car.y - cat.y) < 20) {
+                    lives--;
+                    cars.splice(i, 1); // Remove car
+                    cat.x = 400; // Respawn cat
+                    if (lives <= 0) gameOver = true;
+                }
+                if (car.x < -50 || car.x > 850) cars.splice(i, 1); // Remove off-screen cars
+            });
+
+            // Enraged timer (10 sec = 600 frames at 60 FPS)
+            if (cat.enraged) {
+                cat.enragedTime--;
+                if (cat.enragedTime <= 0) cat.enraged = false;
+            }
+
+            // Increase difficulty (spawn rate)
+            if (Math.random() < 0.02 + score / 10000) spawnCar();
         }
 
-        function BlueSquare() {
-            this.x = Math.random() * (canvas.width - 40);
-            this.y = -40;
-            this.width = 40;
-            this.height = 60;
-            this.speed = objectSpeed;
-            this.hit = false;
-        }
-
-        function Bomb() {
-            this.x = Math.random() * (canvas.width - 20);
-            this.y = -20;
-            this.width = 20;
-            this.height = 20;
-            this.speed = objectSpeed;
-        }
-
-        // Collision detection
-        function checkCollision(rect1, rect2) {
-            return rect1.x < rect2.x + rect2.width &&
-                   rect1.x + rect1.width > rect2.x &&
-                   rect1.y < rect2.y + rect2.height &&
-                   rect1.y + rect1.height > rect2.y;
-        }
-
-        // Reset game
-        function resetGame() {
-            score = 0;
-            lives = 9;
-            catSpeed = 0.35; // Reset to new speed
-            objectSpeed = 2;
-            gameOver = false;
-            invincible = false;
-            invincibilityTimer = 0;
-            carSpawnCount = 0; // Reset car spawn counter
-            cat.x = canvas.width / 2 - 20;
-            cat.y = canvas.height - 50;
-            cars = [];
-            powerUps = [];
-            blueSquares = [];
-            bombs = [];
-            carSpawnTimer = 0;
-            powerUpSpawnTimer = 0;
-            blueSquareSpawnTimer = 0;
-            bombSpawnTimer = 0;
-        }
-
-        // Game loop
-        function gameLoop(timestamp) {
-            const delta = timestamp - lastTime;
-            lastTime = timestamp;
-
+        // Draw everything
+        function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (gameOver) {
-                ctx.fillStyle = 'red';
-                ctx.font = '40px Arial';
-                ctx.fillText('GAME OVER', canvas.width / 2 - 100, canvas.height / 2);
-                ctx.font = '20px Arial';
-                ctx.fillText(`Score: ${score}`, canvas.width / 2 - 40, canvas.height / 2 + 40);
-                setTimeout(resetGame, 2000);
-                return;
-            }
+            // Draw road
+            ctx.fillStyle = '#555';
+            ctx.fillRect(0, 250, 800, 150); // Two-lane road
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 323, 800, 4); // Lane divider
 
-            // Update invincibility
-            if (invincible) {
-                invincibilityTimer -= delta;
-                if (invincibilityTimer <= 0) invincible = false;
-            }
+            // Draw cat (circle for now)
+            ctx.fillStyle = cat.enraged ? 'red' : 'orange';
+            ctx.beginPath();
+            ctx.arc(cat.x, cat.y, 10, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Move player cat
-            if (keys.left && cat.x > 0) cat.x -= catSpeed * delta;
-            if (keys.right && cat.x < canvas.width - cat.width) cat.x += catSpeed * delta;
-            if (tilt !== 0) {
-                const tiltSpeed = catSpeed * delta * (tilt / 30);
-                cat.x += tiltSpeed;
-                if (cat.x < 0) cat.x = 0;
-                if (cat.x > canvas.width - cat.width) cat.x = canvas.width - cat.width;
-            }
-
-            // Dynamic spawn intervals
-            const carSpawnInterval = Math.max(300, 1000 - (objectSpeed - 2) * 150);
-            const blueSquareInterval = Math.max(1500, 6000 - (objectSpeed - 2) * 500);
-            const bombInterval = Math.max(1000, 3000 - (objectSpeed - 2) * 300);
-
-            // Spawn cars (only 1 at a time)
-            carSpawnTimer += delta;
-            if (carSpawnTimer > carSpawnInterval) {
-                cars.push(new Car());
-                carSpawnTimer = 0;
-                carSpawnCount++; // Increment car spawn counter
-                if (carSpawnCount % 10 === 0) { // Increase speed every 10 cars
-                    objectSpeed += 0.1;
-                }
-            }
-
-            // Spawn power-ups (more frequent)
-            powerUpSpawnTimer += delta;
-            if (powerUpSpawnTimer > 8000 && Math.random() < 0.015) {
-                const powerUp = new PowerUp();
-                if (powerUp.type === 'life' && lives >= 9) powerUp.type = 'speed';
-                powerUps.push(powerUp);
-                powerUpSpawnTimer = 0;
-            }
-
-            // Spawn blue squares
-            blueSquareSpawnTimer += delta;
-            if (blueSquareSpawnTimer > blueSquareInterval && Math.random() < 0.03) {
-                blueSquares.push(new BlueSquare());
-                blueSquareSpawnTimer = 0;
-            }
-
-            // Spawn bombs
-            bombSpawnTimer += delta;
-            if (bombSpawnTimer > bombInterval && Math.random() < 0.05) {
-                bombs.push(new Bomb());
-                bombSpawnTimer = 0;
-            }
-
-            // Update and draw cars
-            cars.forEach((car, index) => {
-                if (car.spinning) {
-                    car.x += car.spinDirection * 10;
-                    car.spinAngle += 15;
-                    if (car.x < -car.width || car.x > canvas.width) {
-                        cars.splice(index, 1);
-                        return;
-                    }
-                } else {
-                    car.y += car.speed;
-                }
-                ctx.save();
-                ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
-                ctx.rotate((Math.PI / 2) + Math.PI);
-                if (car.spinning) ctx.rotate(car.spinAngle * Math.PI / 180);
-                ctx.drawImage(carImage, -car.width / 2, -car.height / 2, car.width, car.height);
-                ctx.restore();
-
-                if (!car.spinning && checkCollision(cat, car)) {
-                    if (cat.y + cat.height > car.y && cat.y + cat.height < car.y + 10) score += 100;
-                    else score += 50;
-                    car.spinning = true;
-                    car.spinDirection = cat.x < car.x ? -1 : 1;
-                }
-                if (!car.spinning && car.y > canvas.height) {
-                    cars.splice(index, 1);
-                    lives--;
-                    if (lives <= 0) gameOver = true;
-                }
+            // Draw cars (rectangles)
+            cars.forEach(car => {
+                ctx.fillStyle = car.engineHits > 0 ? '#f88' : '#888';
+                ctx.fillRect(car.x, car.y, 40, 20); // Car body
+                ctx.fillStyle = '#000';
+                ctx.fillRect(car.x, car.y + 15, 10, 5); // Left tire
+                ctx.fillRect(car.x + 30, car.y + 15, 10, 5); // Right tire
             });
 
-            // Update and draw power-ups
-            powerUps.forEach((powerUp, index) => {
-                powerUp.y += objectSpeed;
-                if (powerUp.type === 'life') {
-                    ctx.drawImage(catImage, powerUp.x, powerUp.y, powerUp.width, powerUp.height);
-                } else {
-                    ctx.fillStyle = 'yellow';
-                    ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
-                }
-                if (checkCollision(cat, powerUp)) {
-                    if (powerUp.type === 'life' && lives < 9) lives++;
-                    else if (powerUp.type === 'speed') catSpeed += 0.1;
-                    powerUps.splice(index, 1);
-                }
-                if (powerUp.y > canvas.height) powerUps.splice(index, 1);
-            });
+            // Draw reticle (crosshair)
+            ctx.strokeStyle = 'red';
+            ctx.beginPath();
+            ctx.moveTo(reticle.x - 10, reticle.y);
+            ctx.lineTo(reticle.x + 10, reticle.y);
+            ctx.moveTo(reticle.x, reticle.y - 10);
+            ctx.lineTo(reticle.x, reticle.y + 10);
+            ctx.stroke();
 
-            // Update and draw blue squares
-            blueSquares.forEach((square, index) => {
-                square.y += square.speed;
-                ctx.fillStyle = 'blue';
-                ctx.fillRect(square.x, square.y, square.width, square.height);
-                if (!invincible && !square.hit && checkCollision(cat, square)) {
-                    lives--;
-                    square.hit = true;
-                    invincible = true;
-                    invincibilityTimer = 2500;
-                    if (lives <= 0) gameOver = true;
-                }
-                if (square.y > canvas.height) blueSquares.splice(index, 1);
-            });
-
-            // Update and draw bombs
-            bombs.forEach((bomb, index) => {
-                bomb.y += bomb.speed;
-                ctx.fillStyle = 'black';
-                ctx.fillRect(bomb.x, bomb.y, bomb.width, bomb.height);
-                if (!invincible && checkCollision(cat, bomb)) {
-                    lives--;
-                    invincible = true;
-                    invincibilityTimer = 2500;
-                    bombs.splice(index, 1);
-                    if (lives <= 0) gameOver = true;
-                }
-                if (bomb.y > canvas.height) bombs.splice(index, 1);
-            });
-
-            // Draw player cat
-            ctx.save();
-            ctx.translate(cat.x + cat.width / 2, cat.y + cat.height / 2);
-            if (!invincible || Math.floor(timestamp / 200) % 2 === 0) {
-                ctx.drawImage(catImage, -cat.width / 2, -cat.height / 2, cat.width, cat.height);
-            }
-            ctx.restore();
-
-            // Draw UI
-            ctx.fillStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#fff' : '#000';
+            // Draw HUD
+            ctx.fillStyle = 'white';
             ctx.font = '20px Arial';
-            ctx.fillText(`Score: ${score}`, 10, 30);
-            ctx.fillText(`Lives: ${lives}`, canvas.width - 80, 30);
+            ctx.fillText(`Score: ${score}  Lives: ${lives}`, 10, 30);
 
+            // Game over screen
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, 800, 600);
+                ctx.fillStyle = 'white';
+                ctx.font = '40px Arial';
+                ctx.fillText('Game Over', 300, 280);
+                ctx.font = '20px Arial';
+                ctx.fillText(`Score: ${score}`, 350, 340);
+                ctx.fillText('Refresh to Retry', 320, 400);
+            }
+        }
+
+        // Mouse controls
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            reticle.x = e.clientX - rect.left;
+            reticle.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('click', () => {
+            if (gameOver) return;
+
+            cars.forEach((car, i) => {
+                if (reticle.x > car.x && reticle.x < car.x + 40 && reticle.y > car.y && reticle.y < car.y + 20) {
+                    if (reticle.y < car.y + 10) { // Engine hit
+                        car.engineHits++;
+                        if (car.engineHits >= 2) {
+                            cars.splice(i, 1); // Explode
+                            score += 25;
+                        }
+                    } else if (reticle.y > car.y + 10) { // Tire hit
+                        if (reticle.x < car.x + 20) { // Left tire
+                            cars.splice(i, 1); // Swerve right
+                            score += 10;
+                        } else { // Right tire
+                            cars.splice(i, 1); // Swerve left
+                            score += 10;
+                        }
+                    }
+                }
+            });
+
+            // Check if cat was hit
+            if (Math.abs(reticle.x - cat.x) < 10 && Math.abs(reticle.y - cat.y) < 10) {
+                cat.enraged = true;
+                cat.enragedTime = 600; // 10 sec at 60 FPS
+            }
+        });
+
+        // Main game loop
+        function gameLoop() {
+            update();
+            draw();
             requestAnimationFrame(gameLoop);
         }
 
-        // Start game after images load
-        let imagesLoaded = 0;
-        const totalImages = 2;
-
-        function imageLoaded() {
-            imagesLoaded++;
-            if (imagesLoaded === totalImages) {
-                requestAnimationFrame(gameLoop);
-            }
-        }
-
-        catImage.onload = imageLoaded;
-        carImage.onload = imageLoaded;
-        catImage.onerror = () => console.error('Failed to load cat image');
-        carImage.onerror = () => console.error('Failed to load car image');
+        // Start the game
+        gameLoop();
     </script>
 </body>
 </html>
